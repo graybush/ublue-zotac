@@ -7,5 +7,6 @@ RUN setsebool -P -N use_nfs_home_dirs=1 unconfined_mozilla_plugin_transition=0 &
     rpm-ostree install clevis clevis-dracut clevis-udisks2 ffmpeg-free just libratbag-ratbagd \
       nmap-ncat openssh-askpass rclone vim vim-default-editor \
       xorg-x11-drv-amdgpu vulkan-tools mesa-vulkan-drivers && \
+    systemctl enable rpm-ostree-countme.service && \
     systemctl enable ratbagd.service && \
     ostree container commit
