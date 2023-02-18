@@ -1,4 +1,6 @@
-FROM ghcr.io/graybush/ublue-base:37
+ARG FEDORA_MAJOR_VERSION=37
+
+FROM ghcr.io/graybush/ublue-base:${FEDORA_MAJOR_VERSION}
 
 COPY etc /etc
 
