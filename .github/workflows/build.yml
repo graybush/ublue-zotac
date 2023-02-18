@@ -1,15 +1,21 @@
-name: build-ublue-zotac
+name: build-ublue
 on:
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
   schedule:
     - cron: '21 20 * * *'  # 9:20pm everyday
   push:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
 env:
-    IMAGE_NAME: ublue-zotac
+    IMAGE_NAME: ubuntu
     IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 jobs:
@@ -55,6 +61,16 @@ jobs:
           fi
           echo "alias_tags=${alias_tags[*]}" >> $GITHUB_OUTPUT
 
+      # Build metadata
+      - name: Image Metadata
+        uses: docker/metadata-action@v4
+        id: meta
+        with:
+          images: |
+            ${{ env.IMAGE_NAME }}
+          labels: |
+            io.artifacthub.package.readme-url=https://raw.githubusercontent.com/ublue-os/ubuntu/main/README.md
+
       # Build image using Buildah action
       - name: Build Image
         id: build_image
@@ -69,7 +85,8 @@ jobs:
             ${{ steps.generate-tags.outputs.sha_short }}
           build-args: |
             FEDORA_MAJOR_VERSION=${{ matrix.major_version }}
-          oci: true
+          labels: ${{ steps.meta.outputs.labels }}
+          oci: false
 
       # Workaround bug where capital letters in your GitHub username make it impossible to push to GHCR.
       # https://github.com/macbre/push-to-ghcr/issues/12
