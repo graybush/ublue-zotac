@@ -1,13 +1,19 @@
-name: build-ublue-zotac
+name: build-ublue
 on:
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
   schedule:
     - cron: '21 20 * * *'  # 9:20pm everyday
   push:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - '**.txt'
 env:
     IMAGE_NAME: ublue-zotac
     IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
@@ -16,6 +22,10 @@ jobs:
   push-ghcr:
     name: Build and push image
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -33,17 +43,33 @@ jobs:
         id: generate-tags
         shell: bash
         run: |
-          echo "date=$(date +%Y%m%d)" >> $GITHUB_OUTPUT
           echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
           alias_tags=()
-          if [[ "${{ matrix.is_latest }}" == "true" ]]; then
-            alias_tags+=("latest")
-          fi
-          if [[ "${{ matrix.is_stable }}" == "true" ]]; then
-            alias_tags+=("stable")
+          # Only perform the follow code when the action is spawned from a Pull Request
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            alias_tags+=("pr-${{ github.event.number }}")
+          else
+            # The following is run when the timer is triggered or a merge/push to main
+            echo "date=$(date +%Y%m%d)" >> $GITHUB_OUTPUT
+            alias_tags+=("${{ matrix.major_version }}")
+            if [[ "${{ matrix.is_latest }}" == "true" ]]; then
+              alias_tags+=("latest")
+            fi
+            if [[ "${{ matrix.is_stable }}" == "true" ]]; then
+              alias_tags+=("stable")
+            fi
           fi
           echo "alias_tags=${alias_tags[*]}" >> $GITHUB_OUTPUT
+
+      # Build metadata
+      - name: Image Metadata
+        uses: docker/metadata-action@v4
+        id: meta
+        with:
+          images: |
+            ${{ env.IMAGE_NAME }}
+          labels: |
+            io.artifacthub.package.readme-url=https://raw.githubusercontent.com/ublue-os/ubuntu/main/README.md
 
       # Build image using Buildah action
       - name: Build Image
@@ -57,10 +83,10 @@ jobs:
             ${{ steps.generate-tags.outputs.alias_tags }}
             ${{ steps.generate-tags.outputs.date }}
             ${{ steps.generate-tags.outputs.sha_short }}
-            ${{ matrix.major_version }}
           build-args: |
             FEDORA_MAJOR_VERSION=${{ matrix.major_version }}
-          oci: true
+          labels: ${{ steps.meta.outputs.labels }}
+          oci: false
 
       # Workaround bug where capital letters in your GitHub username make it impossible to push to GHCR.
       # https://github.com/macbre/push-to-ghcr/issues/12
@@ -85,6 +111,32 @@ jobs:
           password: ${{ env.REGISTRY_PASSWORD }}
           extra-args: |
             --disable-content-trust
+
+      # Sign container
+      - uses: sigstore/cosign-installer@main
+
+      # Only needed when running `cosign sign` using a key
+      - name: Write signing key to disk
+        run: |
+          echo "${{ env.COSIGN_PRIVATE_KEY }}" > cosign.key
+          # DEBUG: get character count of key
+          wc -c cosign.key
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sign container image
+        run: |
+          cosign sign --key cosign.key ${{ steps.registry_case.outputs.lowercase }}/${{ env.IMAGE_NAME }}@${TAGS}
+        env:
+          TAGS: ${{ steps.push.outputs.digest }}
+          COSIGN_EXPERIMENTAL: false
 
       - name: Echo outputs
         run: |
