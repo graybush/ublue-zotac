@@ -4,7 +4,7 @@ FROM ghcr.io/graybush/ublue-base:${FEDORA_MAJOR_VERSION}
 
 COPY etc /etc
 
-COPY --from=ghcr.io/ublue-os/udev-rules etc/udev/rules.d/* /etc/udev/rules.d
+COPY --from=ghcr.io/ublue-os/udev-rules:latest /ublue-os-udev-rules /
 
 RUN setsebool -P -N use_nfs_home_dirs=1 unconfined_mozilla_plugin_transition=0 && \
     rpm-ostree override remove nano-default-editor && \
