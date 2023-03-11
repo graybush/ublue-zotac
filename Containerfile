@@ -8,7 +8,7 @@ COPY --from=ghcr.io/ublue-os/udev-rules:latest /ublue-os-udev-rules /
 
 RUN setsebool -P -N use_nfs_home_dirs=1 unconfined_mozilla_plugin_transition=0 && \
     rpm-ostree override remove nano-default-editor && \
-    rpm-ostree install clevis clevis-dracut clevis-udisks2 ffmpeg-free just libratbag-ratbagd \
+    rpm-ostree install clevis clevis-dracut clevis-udisks2 ffmpeg-free freeipa-client just libratbag-ratbagd \
       nmap-ncat openssh-askpass rclone vim vim-default-editor \
       xorg-x11-drv-amdgpu vulkan-tools mesa-vulkan-drivers && \
     systemctl enable rpm-ostree-countme.service && \
